@@ -8,13 +8,16 @@
 
 # Just a framework so far
 
-from gevent import socket
+from gevent import socket # gevent is a 3rd party python library
 from gevent.pool import Pool # Limits how many clients can be handled at once
 from gevent.server import StreamServer # TCP server that works with gevent
 
 from collections import namedtuple # Lightweight data structure
 from io import BytesIO # Treats bytes like a file
 from socket import error as socket_error # Catches low level socket errors
+import logging
+
+logger = logging.getLogger(__name__)
 
 # To notify the connection handling loop of problems
 class CommandError(Exception):
@@ -161,6 +164,7 @@ class Server(object):
 
     # Runs once per client connection
     def connection_handler(self, conn, address):
+        logger.info('Connection received: %s%s' % address)
         # Converts "conn", which is a socket object, into a file like object
         socket_file = conn.makefile('rwb')
 
@@ -169,11 +173,13 @@ class Server(object):
             try:
                 data = self._protocal.handle_request(socket_file)
             except Disconnect:
+                logger.info('Client disconnected: %s%s' % address)
                 break
 
             try:
                 resp = self.get_response(data)
             except CommandError as exc:
+                logger.exception('Command error')
                 resp = Error(exc.args[0])
 
             self._protocal.write_response(socket_file, resp)
@@ -194,6 +200,8 @@ class Server(object):
         command = data[0].upper()
         if command not in self._commands:
             raise CommandError('Unrecognized command: %s' % command)
+        else:
+            logger.debug('Received %s', command)
         
         return self._commands[command](*data[1:])
 
@@ -234,4 +242,6 @@ class Client(object):
     
 if __name__ == '__main__':
     from gevent import monkey; monkey.patch_all()
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(logging.DEBUG)
     Server().run()
