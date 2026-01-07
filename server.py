@@ -74,9 +74,7 @@ class ProtocolHandler(object):
     
     def handle_array(self, socket_file):
         num_items = int(socket_file.readline().rstrip('\r\n'))
-        elements = [self.handle_request(socket_file)
-                    for _ in range(num_items * 2)]
-        return dict(zip(elements[::2], elements[1::2]))
+        return [self.handle_request(socket_file) for _ in range(num_items)]
 
     # Serealizes the response data and sends it to the client
     def write_response(self, socket_file, data):
