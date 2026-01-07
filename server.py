@@ -213,3 +213,21 @@ class Client(object):
         if isinstance(resp, Error):
             raise CommandError(resp.message)
         return resp
+    
+    def get(self, key):
+        return self.execute('GET', key)
+    
+    def set(self, key, value):
+        return self.execute('SET', key, value)
+    
+    def delete(self, key):
+        return self.execute('DELETE', key)
+    
+    def flush(self):
+        return self.execute('FLUSH')
+    
+    def mget(self, *keys):
+        return self.execute('MGET', *keys)
+    
+    def mset(self, *items):
+        return self.execute('MSET', *items)
