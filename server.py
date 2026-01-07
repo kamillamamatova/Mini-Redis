@@ -72,7 +72,7 @@ class ProtocolHandler(object):
         return socket_file.read(length).rstrip[:-2]
     
     def handle_array(self, socket_file):
-        num_elements = int(socket_file.readline().rstrip('\r\n'))
+        num_items = int(socket_file.readline().rstrip('\r\n'))
         elements = [self.handle_request(socket_file)
                     for _ in range(num_items * 2)]
         return dict(zip(elements[::2], elements[1::2]))
@@ -104,7 +104,6 @@ class ProtocolHandler(object):
             for key in data:
                 self._write(buf, key)
                 self._write(buf, data[key])
-
         elif data is None:
             buf.write('$-1\r\n')
         else:
@@ -124,33 +123,6 @@ class Server(object):
         self._kv = {}
 
         self._commands = self.get_commands()
-
-    def get(self, key):
-        return self._kv.get(key)
-    
-    def set(self, key, value):
-        self._kv[key] = value
-        return 1
-    
-    def delete(self, key):
-        if key in self._kv:
-            del self._kv[key]
-            return 1
-        return 0
-    
-    def flush(self):
-        kvlen = len(self._kv)
-        self._kv.clear()
-        return kvlen
-    
-    def mget(self, *keys):
-        return [self._kv.get(key) for key in keys]
-    
-    def mset(self, *items):
-        data = zip(items[::2], items[1::2])
-        for key, value in data:
-            self._kv[key] = value
-        return len(data)
 
     def get_commands(self):
         return {
@@ -207,6 +179,33 @@ class Server(object):
 
     def run(self):
         self._server.serve_forever()
+
+    def get(self, key):
+        return self._kv.get(key)
+    
+    def set(self, key, value):
+        self._kv[key] = value
+        return 1
+    
+    def delete(self, key):
+        if key in self._kv:
+            del self._kv[key]
+            return 1
+        return 0
+    
+    def flush(self):
+        kvlen = len(self._kv)
+        self._kv.clear()
+        return kvlen
+    
+    def mget(self, *keys):
+        return [self._kv.get(key) for key in keys]
+    
+    def mset(self, *items):
+        data = zip(items[::2], items[1::2])
+        for key, value in data:
+            self._kv[key] = value
+        return len(data)
 
 class Client(object):
     def __init__(self, host = '127.0.0.1', port = 31337):
