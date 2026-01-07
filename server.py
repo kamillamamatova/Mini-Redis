@@ -26,9 +26,53 @@ Error = namedtuple('Error', ('message',))
 
 # Defines how data moves across the wire
 class ProtocolHandler(object):
+    def __init__(self):
+        self.handlers = {
+            '+': self.handle_simple_string,
+            '-': self.handle_error,
+            ':': self.handle_integer,
+            '$': self.handle_string,
+            '*': self.handle_array,
+            '%': self.handle_dict
+        }
+
+    # Analyzes a request from the client into its component parts
     def handle_request(self, socket_file):
-        # Analyzes a request from the client into its component parts
-        pass
+        first_byte = socket_file.read(1)
+        if not first_byte:
+            raise Disconnect()
+        
+        try:
+            # Delegates to the appropriate handler based on the first byte
+            return self.handlers[first_byte](socket_file)
+        except KeyError:
+            raise CommandError('Bad Request')
+        
+    # For each handler
+
+    def handle_simple_string(self, socket_file):
+        return socket_file.readline().rstrip('\r\n')
+    
+    def handle_error(self, socket_file):
+        return Error(socket_file.readline().rstrip('\r\n'))
+    
+    def handle_integer(self, socket_file):
+        return int(socket_file.readline().rstrip('\r\n'))
+    
+    def handle_string(self, socket_file):
+        # First reads the length
+        length = int(socket_file.readline().rstrip('\r\n'))
+        # NULL
+        if length == -1:
+            return None
+        length += 2 # Includes the '\r\n' in count
+        return socket_file.read(length).rstrip[:-2]
+    
+    def handle_array(self, socket_file):
+        num_elements = int(socket_file.readline().rstrip('\r\n'))
+        elements = [self.handle_request(socket_file)
+                    for _ in range(num_items * 2)]
+        return dict(zip(elements[::2], elements[1::2]))
 
     def write_response(self, socket_file, data):
         # Serealizes the response data and sends it to the client
