@@ -231,3 +231,7 @@ class Client(object):
     
     def mset(self, *items):
         return self.execute('MSET', *items)
+    
+if __name__ == '__main__':
+    from gevent import monkey; monkey.patch_all()
+    Server().run()
