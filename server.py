@@ -44,6 +44,7 @@ class ProtocolHandler(object):
         first_byte = socket_file.read(1)
         if not first_byte:
             raise Disconnect()
+        first_byte = first_byte.decode()
         
         try:
             # Delegates to the appropriate handler based on the first byte
