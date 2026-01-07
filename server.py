@@ -117,8 +117,20 @@ class Server(object):
             spawn = self._pool
         )
 
-        self._protocal = ProtocalHandler()
+        self._protocal = ProtocolHandler()
         self._kv = {}
+
+        self._commands = self.get_commands()
+
+    def get_commands(self):
+        return {
+            'GET': self.get,
+            'SET': self.set,
+            'DELETE': self.delete,
+            'FLUSH': self.flush,
+            'MGET': self.mget,
+            'MSET': self.mset
+        }
 
     # Runs once per client connection
     def connection_handler(self, conn, address):
@@ -139,11 +151,24 @@ class Server(object):
 
             self._protocal.write_response(socket_file, resp)
 
+    # Unpacks the data sent by the client,
+    # excecutes the command they specified, 
+    # and passes back the return value
     def get_response(self, data):
-        # Unpacks the data sent by the client,
-        # excecutes the command they specified, 
-        # and passes back the return value
-        pass
+        if not isinstance(data, list):
+            try:
+                data = data.split()
+            except:
+                raise CommandError('Request must be a list or simple string')
+        
+        if not data:
+            raise CommandError('Missing command')
+        
+        command = data[0].upper()
+        if command not in self._commands:
+            raise CommandError('Unrecognized command: %s' % command)
+        
+        return self._commands[command](*data[1:])
 
     def run(self):
         self._server.serve_forever()
