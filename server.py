@@ -79,7 +79,7 @@ class ProtocolHandler(object):
     # Serealizes the response data and sends it to the client
     def write_response(self, socket_file, data):
         buf = BytesIO()
-        self.write(buf, data)
+        self._write(buf, data)
         buf.seek(0)
         socket_file.write(buf.getvalue())
         socket_file.flush()
@@ -89,7 +89,8 @@ class ProtocolHandler(object):
             data = data.encode('utf-8')
 
         if isinstance(data, bytes):
-            buf.write('$%s\n%s\r\n' % (len(data), data))
+            buf.write(b'$%d\r\n' % len(data))
+            buf.write(data + b'\r\n')
         elif isinstance(data, int):
             buf.write(':%s\r\n' % data)
         elif isinstance(data, Error):
