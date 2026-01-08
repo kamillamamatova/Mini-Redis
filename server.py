@@ -94,7 +94,7 @@ class ProtocolHandler(object):
         elif isinstance(data, int):
             buf.write(':%s\r\n' % data)
         elif isinstance(data, Error):
-            buf.write('-%s\r\n' % error.message)
+            buf.write('-%s\r\n' % data.message)
         elif isinstance(data, (list, tuple)):
             buf.write('*%s\r\n' % len(data))
             for item in data:
