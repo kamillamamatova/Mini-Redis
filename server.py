@@ -43,7 +43,7 @@ class ProtocolHandler(object):
             raise Disconnect()
         
         #first_byte is bytes in Python 3
-        first_byte = first_byte.decode()
+        first_byte = first_byte.decode("utf-8", errors = "strict")
         
         try:
             # Delegates to the appropriate handler based on the first byte
@@ -57,7 +57,7 @@ class ProtocolHandler(object):
         return socket_file.readline().rstrip(b"\r\n").decode("utf-8", errors = "strict")
     
     def handle_error(self, socket_file):
-        msg = Error(socket_file.readline().rstrip(b"\r\n").decode("utf-8", errors = "strict"))
+        msg = socket_file.readline().rstrip(b"\r\n").decode("utf-8", errors = "strict")
         return Error(msg)
     
     def handle_integer(self, socket_file):
@@ -72,13 +72,18 @@ class ProtocolHandler(object):
             return None
         
         length += 2 # Includes the '\r\n' in count
-        return socket_file.read(length)[:-2]
+        data = socket_file.read(length)[:-2]
+        return data.decode("utf-8", errors = "strict")
     
     def handle_array(self, socket_file):
+        num_elements = int(socket_file.readline().rstrip(b"\r\n"))
+        return [self.handle_request(socket_file) for _ in range(num_elements)]
+        #return [self.handle_request(socket_file) for _ in range(num_items)]
+
+    def handle_dict(self, socket_file):
         num_items = int(socket_file.readline().rstrip(b"\r\n"))
         elements = [self.handle_request(socket_file) for _ in range(num_items * 2)]
         return dict(zip(elements[::2], elements[1::2]))
-        #return [self.handle_request(socket_file) for _ in range(num_items)]
 
     # Serealizes the response data and sends it to the client
     def write_response(self, socket_file, data):
@@ -97,7 +102,7 @@ class ProtocolHandler(object):
             buf.write(data + b"\r\n")
 
         elif isinstance(data, int):
-            buf.write(b":%s\r\n" % data)
+            buf.write(b":%d\r\n" % data)
 
         elif isinstance(data, Error):
             msg = data.message
@@ -108,13 +113,13 @@ class ProtocolHandler(object):
         elif isinstance(data, (list, tuple)):
             buf.write(b"*%d\r\n" % len(data))
             for item in data:
-                self._write(buf, item)
+                self.write(buf, item)
 
         elif isinstance(data, dict):
             buf.write(b"%%%d\r\n" % len(data))
             for key, value in data.items():
-                self._write(buf, key)
-                self._write(buf, value)
+                self.write(buf, key)
+                self.write(buf, value)
 
         elif data is None:
             buf.write(b"$-1\r\n")
@@ -132,7 +137,7 @@ class Server(object):
             spawn = self._pool
         )
 
-        self._protocal = ProtocolHandler()
+        self._protocol = ProtocolHandler()
         self._kv = {}
         self._commands = self.get_commands()
 
@@ -148,16 +153,16 @@ class Server(object):
 
     # Runs once per client connection
     def connection_handler(self, conn, address):
-        logger.info('Connection received: %s%s' % address)
+        logger.info("Connection received: %s:%s", address[0], address[1])
         # Converts "conn", which is a socket object, into a file like object
         socket_file = conn.makefile('rwb')
 
         # Processes client requests until the client disconnects
         while True:
             try:
-                data = self._protocal.handle_request(socket_file)
+                data = self._protocol.handle_request(socket_file)
             except Disconnect:
-                logger.info('Client disconnected: %s:%s' % address[0], address[1])
+                logger.info("Client disconnected: %s:%s", address[0], address[1])
                 break
 
             try:
@@ -166,7 +171,7 @@ class Server(object):
                 logger.exception('Command error')
                 resp = Error(exc.args[0])
 
-            self._protocal.write_response(socket_file, resp)
+            self._protocol.write_response(socket_file, resp)
 
     # Unpacks the data sent by the client,
     # excecutes the command they specified, 
@@ -233,7 +238,7 @@ class Server(object):
         if len(items) % 2 != 0:
             raise CommandError("MSET requires an even number of arguments")
 
-        pairs = zip(items[::2], items[1::2])
+        pairs = list(zip(items[::2], items[1::2]))
         for key, value in pairs:
             self._kv[key] = value
         return len(pairs)
@@ -277,5 +282,5 @@ if __name__ == '__main__':
 
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(logging.DEBUG)
-    
+
     Server().run()
